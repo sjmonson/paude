@@ -1593,3 +1593,26 @@ class TestLocalBaseRef:
         assert self._base_image_args(mock_run) == [
             "BASE_IMAGE=localhost/paude-runtime:abc"
         ]
+
+
+@pytest.mark.parametrize("override", [None, "example.com/custom:latest"])
+def test_custom_build_receives_paude_base_image(tmp_path, monkeypatch, override):
+    from paude.config.models import PaudeConfig
+    from paude.container.image import ImageManager
+
+    monkeypatch.setenv("PAUDE_REGISTRY", "example.com/paude")
+    dockerfile = tmp_path / "Containerfile"
+    dockerfile.write_text("ARG PAUDE_BASE_IMAGE\nFROM $PAUDE_BASE_IMAGE\n")
+    args = {"TOOL_VERSION": "1"}
+    if override:
+        args["PAUDE_BASE_IMAGE"] = override
+    config = PaudeConfig(dockerfile=dockerfile, build_args=args)
+    manager = ImageManager(platform="linux/amd64")
+    with patch.object(manager, "build_image") as build:
+        manager._resolve_custom_base(config, "test")
+    assert build.call_args.args[3] == {
+        "PAUDE_BASE_IMAGE": override
+        or f"example.com/paude/paude-base-centos10:{manager.version}",
+        "TOOL_VERSION": "1",
+    }
+    assert config.build_args == args

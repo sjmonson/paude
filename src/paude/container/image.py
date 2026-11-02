@@ -359,7 +359,12 @@ class ImageManager:
             user_image = f"paude-user-base:{config_hash}"
             build_context = config.build_context or config.dockerfile.parent
             print(f"  → Building from: {config.dockerfile}", file=sys.stderr)
-            user_build_args = dict(config.build_args)
+            user_build_args = {
+                "PAUDE_BASE_IMAGE": (
+                    f"{self.registry}/paude-base-centos10:{self.version}"
+                ),
+                **config.build_args,
+            }
             self.build_image(
                 config.dockerfile,
                 user_image,
