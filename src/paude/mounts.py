@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from paude.agents.base import AgentComposition
-from paude.constants import CONTAINER_HOME
 
 if TYPE_CHECKING:
     from paude.agents.base import Agent, AgentComposition
@@ -69,13 +68,5 @@ def build_mounts(
 
             claude = get_agent("claude")
             mounts.extend(claude.host_config_mounts(home))
-
-        # gitconfig (ro) - shared across all agents
-        gitconfig = home / ".gitconfig"
-        resolved_gitconfig = resolve_path(gitconfig)
-        if resolved_gitconfig and resolved_gitconfig.is_file():
-            mounts.extend(
-                ["-v", f"{resolved_gitconfig}:{CONTAINER_HOME}/.gitconfig:ro"]
-            )
 
     return mounts

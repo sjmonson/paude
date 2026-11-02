@@ -1817,7 +1817,10 @@ class TestPodmanBackendSyncHostConfig:
         backend = make_backend(mock_runner)
         backend._engine = mock_runner.engine
 
-        with patch("paude.backends.sync_base.Path.home", return_value=tmp_path):
+        with patch.dict(
+            "os.environ",
+            {"HOME": str(tmp_path), "GIT_CONFIG_GLOBAL": str(tmp_path / ".gitconfig")},
+        ):
             claude_dir = tmp_path / ".claude"
             claude_dir.mkdir()
             (claude_dir / "settings.json").write_text("{}")
@@ -1845,7 +1848,10 @@ class TestPodmanBackendSyncHostConfig:
         backend = make_backend(mock_runner)
         backend._engine = mock_runner.engine
 
-        with patch("paude.backends.sync_base.Path.home", return_value=tmp_path):
+        with patch.dict(
+            "os.environ",
+            {"HOME": str(tmp_path), "GIT_CONFIG_GLOBAL": str(tmp_path / ".gitconfig")},
+        ):
             (tmp_path / ".gitconfig").write_text("[user]\n  name = Test\n")
 
             backend._setup.sync_host_config("paude-test", "claude")
@@ -1871,7 +1877,10 @@ class TestPodmanBackendSyncHostConfig:
         backend = make_backend(mock_runner)
         backend._engine = mock_runner.engine
 
-        with patch("paude.backends.sync_base.Path.home", return_value=tmp_path):
+        with patch.dict(
+            "os.environ",
+            {"HOME": str(tmp_path), "GIT_CONFIG_GLOBAL": str(tmp_path / ".gitconfig")},
+        ):
             backend._setup.sync_host_config("paude-test", "claude")
 
         # Should have called exec touch /credentials/.ready
@@ -1898,7 +1907,10 @@ class TestPodmanBackendSyncHostConfig:
         backend = make_backend(mock_runner)
         backend._engine = mock_runner.engine
 
-        with patch("paude.backends.sync_base.Path.home", return_value=tmp_path):
+        with patch.dict(
+            "os.environ",
+            {"HOME": str(tmp_path), "GIT_CONFIG_GLOBAL": str(tmp_path / ".gitconfig")},
+        ):
             (tmp_path / ".claude").mkdir()
             (tmp_path / ".gitconfig").write_text("[user]\n  name = Test\n")
 
@@ -1932,7 +1944,10 @@ class TestPodmanBackendSyncHostConfig:
         backend = make_backend(mock_runner)
         backend._engine = mock_runner.engine
 
-        with patch("paude.backends.sync_base.Path.home", return_value=tmp_path):
+        with patch.dict(
+            "os.environ",
+            {"HOME": str(tmp_path), "GIT_CONFIG_GLOBAL": str(tmp_path / ".gitconfig")},
+        ):
             backend._setup.sync_host_config("paude-test", "claude")
 
         captured = capsys.readouterr()

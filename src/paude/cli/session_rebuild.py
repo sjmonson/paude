@@ -141,7 +141,13 @@ def prepare_session_mounts(
         return SessionMounts(mounts=mounts, remote_config=None)
 
     typer.echo("Syncing configuration to remote host...", err=True)
-    remote_config = sync_configs_to_remote(engine.transport, mounts)
+    from paude.constants import CONTAINER_HOME
+    from paude.git_config import global_git_snapshot
+
+    with global_git_snapshot() as gitconfig:
+        if gitconfig is not None:
+            mounts.extend(["-v", f"{gitconfig}:{CONTAINER_HOME}/.gitconfig:ro"])
+        remote_config = sync_configs_to_remote(engine.transport, mounts)
     return SessionMounts(
         mounts=remap_mounts(mounts, remote_config.path_map),
         remote_config=remote_config,

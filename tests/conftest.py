@@ -1,6 +1,7 @@
 """Pytest fixtures for paude tests."""
 
 import importlib
+import os
 from pathlib import Path
 from types import ModuleType
 from typing import Any
@@ -35,6 +36,14 @@ def _isolate_config(request, tmp_path, monkeypatch):
     if not _is_integration(request):
         monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg-config"))
         monkeypatch.chdir(tmp_path)
+        monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(tmp_path / "test.gitconfig"))
+        monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+        for key in tuple(os.environ):
+            if key.startswith("GIT_CONFIG_") and key not in {
+                "GIT_CONFIG_GLOBAL",
+                "GIT_CONFIG_NOSYSTEM",
+            }:
+                monkeypatch.delenv(key)
 
 
 @pytest.fixture

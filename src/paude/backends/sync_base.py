@@ -8,7 +8,8 @@ Subclasses provide engine-specific copy implementations.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from pathlib import Path
+
+from paude.git_config import global_git_snapshot
 
 CONFIG_PATH = "/credentials"
 
@@ -39,17 +40,16 @@ class BaseConfigSyncer(ABC):
         Subclasses call this from their public sync methods, wrapping
         with backend-specific prepare and finalize steps.
         """
-        home = Path.home()
-        self._sync_gitconfig(home)
+        self._sync_gitconfig()
 
     # -- shared step implementations ---------------------------------------
 
-    def _sync_gitconfig(self, home: Path) -> None:
-        """Sync ~/.gitconfig."""
-        gitconfig = home / ".gitconfig"
-        if gitconfig.is_file():
-            self._copy_file(
-                str(gitconfig),
-                f"{CONFIG_PATH}/gitconfig",
-                context="copy gitconfig",
-            )
+    def _sync_gitconfig(self) -> None:
+        """Sync resolved global Git configuration."""
+        with global_git_snapshot() as gitconfig:
+            if gitconfig is not None:
+                self._copy_file(
+                    str(gitconfig),
+                    f"{CONFIG_PATH}/gitconfig",
+                    context="copy gitconfig",
+                )

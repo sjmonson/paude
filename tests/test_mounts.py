@@ -57,7 +57,7 @@ class TestBuildMounts:
         mounts = build_mounts(home)
         mount_str = " ".join(mounts)
 
-        assert "/home/paude/.gitconfig:ro" in mount_str
+        assert ".gitconfig" not in mount_str
 
     def test_include_config_false_skips_all_config_mounts(self, tmp_path: Path):
         """include_config=False returns no config or gitconfig mounts."""
@@ -81,4 +81,4 @@ class TestBuildMounts:
         mounts_explicit = build_mounts(home, include_config=True)
 
         assert mounts_default == mounts_explicit
-        assert len(mounts_default) > 0
+        assert ".gitconfig" not in " ".join(mounts_default)
