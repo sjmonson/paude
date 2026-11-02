@@ -315,7 +315,7 @@ def _expand_allowed_domains(
                 merged.append(alias)
         extra_aliases = merged
 
-    domains_input = allowed_domains if allowed_domains else ["default"]
+    domains_input = allowed_domains if allowed_domains is not None else ["default"]
     expanded = expand_domains(domains_input, extra_aliases=extra_aliases)
     if expanded and required_aliases:
         required = expand_domains(required_aliases)
@@ -416,7 +416,7 @@ def _prepare_session_create(
 
         env.update(build_otel_env(agent_name, otel_endpoint))
         hostname, _ = parse_otel_endpoint(otel_endpoint)
-        if hostname not in expanded_domains:
+        if expanded_domains and hostname not in expanded_domains:
             expanded_domains.append(hostname)
 
     # Resolve the host user's git identity so commits inside the container are
