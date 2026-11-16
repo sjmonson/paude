@@ -198,7 +198,7 @@ _SECTIONS: tuple[HelpSection, ...] = (
                 " --credential-domain anthropic=gw.example.com"
                 " --env ANTHROPIC_BASE_URL=https://gw.example.com",
                 "Send the API key to a company AI gateway via the proxy"
-                " (one provider per host)",
+                " (optional path prefixes let providers share a custom host)",
             ),
             ("paude create --dry-run", "Verify configuration without creating"),
             ("paude create --backend=docker", "Create session using Docker engine"),
@@ -241,7 +241,8 @@ _SECTIONS: tuple[HelpSection, ...] = (
             "User defaults: ~/.config/paude/defaults.json"
             " (backend, yolo, git, domains, etc.)\n"
             'Project hints: paude.json "create" section'
-            " (allowed-domains, allowed-endpoints, agent, provider, agent-configs,"
+            " (allowed-domains, allowed-endpoints, credential-domain,"
+            " agent, provider, agent-configs,"
             " agents,"
             " providers, agent-providers)"
         ),

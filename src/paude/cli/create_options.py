@@ -50,10 +50,11 @@ CredentialDomainOption = Annotated[
         "--credential-domain",
         help=(
             "Have the proxy also inject a provider's API key for a custom "
-            "host, as PROVIDER=HOST[:PORT] (e.g. anthropic=gw.example.com). "
-            "The host is added to the allowlist. Can be repeated. Each "
-            "host can carry only one provider's credential; hosts with "
-            "built-in routes (e.g. api.anthropic.com) are rejected."
+            "host, as PROVIDER=HOST[:PORT] with optional /PATH_PREFIX. "
+            "The host is added to the allowlist. Repeatable; overrides "
+            "create.credential-domain "
+            "in paude.json. Distinct explicit paths let providers share a "
+            "custom host; longer paths win. Live built-in conflicts are rejected."
         ),
     ),
 ]

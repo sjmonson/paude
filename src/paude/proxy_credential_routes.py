@@ -1,26 +1,10 @@
-"""Custom credential routing for the paude-proxy sidecar.
+"""Custom credential routes, optionally restricted to a request path prefix.
 
-paude-proxy injects each provider credential only for that provider's own
-domains (e.g. ``ANTHROPIC_API_KEY`` only for ``*.anthropic.com``). A
-``--credential-domain PROVIDER=HOST[:PORT]`` spec routes a provider's secret
-to an additional host, such as a company AI gateway, by handing the proxy a
-custom routing file through ``PAUDE_PROXY_CREDENTIALS_CONFIG``.
-
-paude-proxy *replaces* its built-in routing table with a custom file rather
-than merging, so the file paude writes is the built-in table plus the custom
-routes, which go first because the proxy uses the first matching route.
-Because routes match on host alone, a host can carry only one provider's
-credential; ``build_credential_routes_config`` rejects any host that would
-receive two — whether from two specs or from a spec shadowing a built-in
-route the proxy will actually load (it skips a route whose env var is
-unset, so a spec that merely repeats a dead built-in route is redundant,
-not conflicting) — so one key cannot silently shadow the other. The check
-runs wherever the table is built: at create time and on every proxy
-rebuild.
-
-Domain matching follows the proxy's store, not the advisory
-``domain_matches_host``: a ``.suffix`` entry needs the dot, so the bare
-apex does not match.
+Custom routes precede the proxy's complete built-in table. More specific
+path prefixes come first because the proxy uses the first matching route.
+Different credentials may share a custom host when explicit, distinct path
+prefixes determine precedence. Host-only conflicts and collisions with live
+built-in credentials remain rejected, including on proxy rebuilds.
 """
 
 from __future__ import annotations
@@ -97,16 +81,35 @@ def _routable_secret_vars(provider_name: str) -> list[str]:
 
 
 def split_credential_domain(spec: str) -> tuple[str, str]:
-    """Split a normalized ``provider=host:port`` spec."""
+    """Split a normalized ``provider=host:port[/path]`` spec."""
     provider, _, authority = spec.partition("=")
     return provider, authority
+
+
+def _split_target(target: str) -> tuple[str, str]:
+    """Separate an authority from an optional literal path prefix."""
+    authority, separator, path = target.partition("/")
+    return authority, separator + path
+
+
+def _canonical_target(target: str) -> str:
+    """Normalize the authority without changing path matching semantics."""
+    authority, prefix = _split_target(target)
+    if any(char.isspace() or ord(char) < 32 for char in prefix) or any(
+        char in prefix for char in "?#*%\\"
+    ):
+        raise ValueError("path must be a literal prefix without query or fragment")
+    if authority.endswith("]") or ":" not in authority:
+        authority = f"{authority}:{_DEFAULT_PORT}"
+    (canonical,) = normalize_allowed_endpoints([authority])
+    return canonical + prefix
 
 
 def parse_credential_domains(
     values: list[str] | None,
     providers: list[str],
 ) -> list[str]:
-    """Validate ``PROVIDER=HOST[:PORT]`` specs into ``provider=host:port``.
+    """Normalize ``PROVIDER=HOST[:PORT][/PATH_PREFIX]`` specs.
 
     Raises:
         ValueError: On a malformed spec, a provider the session does not
@@ -120,7 +123,8 @@ def parse_credential_domains(
         provider, sep, target = (part.strip() for part in value.partition("="))
         if not sep or not provider or not target:
             raise ValueError(
-                f"Invalid credential domain '{value}'; expected PROVIDER=HOST[:PORT]."
+                f"Invalid credential domain '{value}'; "
+                "expected PROVIDER=HOST[:PORT][/PATH_PREFIX]."
             )
         if provider not in providers:
             configured = ", ".join(providers) or "none"
@@ -133,11 +137,8 @@ def parse_credential_domains(
                 f"Provider '{provider}' has no API-key credential that can be "
                 "routed to a custom domain."
             )
-        authority = target
-        if authority.endswith("]") or ":" not in authority:
-            authority = f"{authority}:{_DEFAULT_PORT}"
         try:
-            (canonical,) = normalize_allowed_endpoints([authority])
+            canonical = _canonical_target(target)
         except ValueError as exc:
             raise ValueError(f"Invalid credential domain '{value}': {exc}") from None
         spec = f"{provider}={canonical}"
@@ -149,13 +150,16 @@ def parse_credential_domains(
 def credential_domain_hosts(specs: list[str]) -> list[str]:
     """Return the hosts the specs route credentials to, for the allowlist."""
     return list(
-        dict.fromkeys(authority_host(split_credential_domain(s)[1]) for s in specs)
+        dict.fromkeys(
+            authority_host(_split_target(split_credential_domain(s)[1])[0])
+            for s in specs
+        )
     )
 
 
 def credential_domain_endpoints(specs: list[str]) -> list[str]:
     """Return the nonstandard-port authorities the specs need allowed."""
-    authorities = (split_credential_domain(spec)[1] for spec in specs)
+    authorities = (_split_target(split_credential_domain(spec)[1])[0] for spec in specs)
     return list(
         dict.fromkeys(a for a in authorities if not a.endswith(f":{_DEFAULT_PORT}"))
     )
@@ -166,24 +170,30 @@ def _custom_routes(specs: list[str]) -> list[tuple[str, str, dict[str, Any]]]:
     defaults = {route["env_var"]: route for route in DEFAULT_CREDENTIAL_ROUTES}
     custom: list[tuple[str, str, dict[str, Any]]] = []
     for spec in specs:
-        provider, authority = split_credential_domain(spec)
+        provider, target = split_credential_domain(spec)
+        authority, prefix = _split_target(target)
         host = authority_host(authority)
         for var in _routable_secret_vars(provider):
             route = copy.deepcopy(defaults[var])
             route["domains"] = [host]
+            if prefix:
+                route.setdefault("params", {})["path_prefix"] = prefix
             custom.append((spec, host, route))
+    custom.sort(
+        key=lambda entry: -len(entry[2].get("params", {}).get("path_prefix", ""))
+    )
     return custom
 
 
 def _reject_host_collision(
     spec: str, env_var: str, host: str, rival_var: str, rival_source: str
 ) -> NoReturn:
-    """Raise the shared one-credential-per-host rejection."""
+    """Reject ambiguous custom routes or a live built-in collision."""
     raise ValueError(
         f"Credential domain '{spec}' routes {env_var} to host '{host}', "
         f"which already receives {rival_var} via {rival_source}; the proxy "
-        "injects only the first matching credential per host. Route each "
-        "provider to its own host."
+        "injects only the first matching credential. Use distinct explicit "
+        "path prefixes for custom hosts, or separate provider hosts."
     )
 
 
@@ -255,30 +265,19 @@ def _reject_ambiguous_hosts(
     custom: list[tuple[str, str, dict[str, Any]]],
     proxy_env_names: set[str] | None,
 ) -> None:
-    """Enforce one credential per host across the merged routing table.
-
-    The proxy injects only the first matching route per host, and custom
-    routes precede the built-in table, so a host claimed by routes carrying
-    different ``env_var``s silently drops every credential but the first —
-    or shadows a built-in route entirely. Only hosts a custom route claims
-    are checked, and only against built-in routes the proxy will actually
-    load: the proxy skips a route whose env var is unset, so a spec that
-    merely repeats a dead built-in route is redundant, not conflicting.
-    The built-in table's own overlaps are intentional alternates (OAuth vs
-    API key) resolved by which env var is set.
-
-    Raises:
-        ValueError: Naming the offending spec, its credential, and the
-            credential it would collide with.
-    """
-    claims: dict[str, tuple[str, str]] = {}
+    """Allow explicit path precedence while preserving built-in protections."""
+    claims: dict[str, list[tuple[str, str, str]]] = {}
     for spec, host, route in custom:
-        prior_var, prior_spec = claims.setdefault(host, (route["env_var"], spec))
-        if prior_var != route["env_var"]:
-            _reject_host_collision(
-                spec, route["env_var"], host, prior_var, f"spec '{prior_spec}'"
-            )
-    for host, (env_var, spec) in claims.items():
+        prefix = route.get("params", {}).get("path_prefix", "")
+        env_var = route["env_var"]
+        for prior_var, prior_spec, prior_prefix in claims.get(host, []):
+            if prior_var != env_var and (
+                not prefix or not prior_prefix or prefix == prior_prefix
+            ):
+                _reject_host_collision(
+                    spec, env_var, host, prior_var, f"spec '{prior_spec}'"
+                )
+        claims.setdefault(host, []).append((env_var, spec, prefix))
         for default in _live_builtin_routes(proxy_env_names):
             if default["env_var"] != env_var and any(
                 _route_domain_matches(domain, host) for domain in default["domains"]
@@ -292,7 +291,7 @@ def validate_credential_domain_specs(
     specs: list[str],
     proxy_credentials: Mapping[str, str] | None = None,
 ) -> None:
-    """Reject specs whose hosts would receive more than one credential.
+    """Reject ambiguous custom routes and live built-in collisions.
 
     Runs the same check ``build_credential_routes_config`` enforces, for
     callers that validate early (``paude create``) rather than build.
@@ -321,9 +320,9 @@ def build_credential_routes_config(
             context) assumes every built-in route is live.
 
     Raises:
-        ValueError: If a spec routes a credential to a host that already
-            receives another credential, whether from another spec or from
-            a live built-in route (see ``_reject_ambiguous_hosts``).
+        ValueError: If different credentials share an ambiguous custom path,
+            a host-only route, or another credential's live built-in domain
+            (see ``_reject_ambiguous_hosts``).
     """
     custom = _custom_routes(specs)
     _reject_ambiguous_hosts(custom, _proxy_env_names(proxy_credentials))

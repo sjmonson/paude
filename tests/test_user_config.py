@@ -116,6 +116,24 @@ class TestResolveCreateOptions:
         defaults.update(kwargs)
         return resolve_create_options(**defaults)
 
+    @pytest.mark.parametrize(
+        ("cli", "expected", "source"),
+        [
+            (None, ["anthropic=project.example/v1"], "paude.json"),
+            (["anthropic=cli.example/v1"], ["anthropic=cli.example/v1"], "cli"),
+            ([], [], "cli"),
+        ],
+    )
+    def test_credential_domains_cli_replaces_project(self, cli, expected, source):
+        result = self._resolve(
+            cli_credential_domains=cli,
+            project_config=PaudeConfig(
+                create_credential_domains=["anthropic=project.example/v1"]
+            ),
+        )
+        assert result.credential_domains.value == expected
+        assert result.credential_domains.source == source
+
     def test_builtin_defaults(self):
         """Returns built-in defaults when nothing is configured."""
         result = self._resolve()

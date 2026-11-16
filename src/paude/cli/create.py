@@ -198,6 +198,7 @@ def session_create(
             cli_allowed_domains=allowed_domains,
             cli_allowed_endpoints=allowed_endpoints,
             cli_otel_endpoint=otel_endpoint,
+            cli_credential_domains=credential_domain,
             project_config=config,
             user_defaults=user_defaults,
         )
@@ -242,10 +243,10 @@ def session_create(
     try:
         extra_env = parse_env_options(env_options)
         r_credential_domains = parse_credential_domains(
-            credential_domain, resolved.providers
+            resolved.credential_domains.value, resolved.providers
         )
-        # Validate the routing table here so host collisions (two
-        # credentials on one host, including live built-in routes) fail at
+        # Validate the routing table here so ambiguous routes and
+        # conflicts with live built-in credentials fail at
         # create time with this error handler, not later in proxy setup.
         # The gathered credentials decide which built-in routes are live,
         # mirroring the proxy, which skips routes whose env var is unset.

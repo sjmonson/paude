@@ -59,6 +59,12 @@ class TestDetectConfig:
 class TestParseConfig:
     """Tests for config parsing."""
 
+    def test_parses_credential_domain_create_hint(self, tmp_path: Path) -> None:
+        path = tmp_path / "paude.json"
+        routes = ["anthropic=example.com/v1/messages", "openai=example.com/v1"]
+        path.write_text(json.dumps({"create": {"credential-domain": routes}}))
+        assert parse_config(path).create_credential_domains == routes
+
     def test_parses_allowed_endpoints_create_hint(self, tmp_path: Path) -> None:
         config_file = tmp_path / "paude.json"
         config_file.write_text(

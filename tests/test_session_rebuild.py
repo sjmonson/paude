@@ -220,6 +220,14 @@ class TestSessionConfigFromSpec:
         assert config.allowed_domains == ["github.com"]
         assert config.otel_ports == [4317]
 
+    def test_path_credential_routes_survive_rebuild(self) -> None:
+        routes = [
+            "anthropic=gw.example.com:443/v1/messages",
+            "openai=gw.example.com:443/v1",
+        ]
+        config = self._config(SessionSpec(credential_domains=routes))
+        assert config.credential_domains == routes
+
     def test_agent_and_credential_providers_are_read_verbatim(self) -> None:
         """No caller-specific defaults live here.
 

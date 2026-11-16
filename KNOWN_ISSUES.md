@@ -985,38 +985,22 @@ policy.
 
 ### FEATURE-002: Single-session MaaS endpoints serving multiple protocols
 
-**Status**: Open (deferred follow-up)
-**Priority**: Low (workaround exists)
+**Status**: Resolved (2026-11-16)
+**Priority**: Low
 **Discovered**: 2026-10-20 during review follow-up on the `--env`/`--credential-domain` work
 
-A model-as-a-service endpoint that speaks both the Anthropic protocol
-(`/v1/messages`) and the OpenAI protocol (`/v1/chat/completions`) on one
-host, authenticating with a single key, cannot serve a session that
-installs both claude and codex agents. The user would export the same
-secret as both `ANTHROPIC_API_KEY` and `OPENAI_API_KEY`, map
-`--agent-provider claude=anthropic --agent-provider codex=openai`, and
-route both providers to the same `--credential-domain` host — which
-`parse_credential_domains` (`src/paude/proxy_credential_routes.py`)
-rejects, because paude-proxy applies only the first matching route per
-host (so codex would get `x-api-key` instead of `Authorization: Bearer`,
-or vice versa depending on flag order — silently, and only working at all
-if the gateway happens to accept the winning header on both protocols).
+Credential-domain mappings now accept explicit path prefixes. A gateway serving
+Anthropic and OpenAI protocols on one host can use
+`anthropic=example.com/v1/messages` and `openai=example.com/v1`; the longer prefix
+wins and selects the appropriate authentication header. The routes can be set in
+`paude.json` under `create.credential-domain` or through CLI flags. Shared-key
+setups export the key as both `ANTHROPIC_API_KEY` and `OPENAI_API_KEY`.
 
-**Workaround**: two sessions, one per agent, each with a single provider
-routed to the shared host. The one-provider-per-host rule is per-session
-(each session has its own proxy sidecar and routing file), so two
-sessions pointing at the same host do not collide, and each proxy injects
-its key in the correct header format for its protocol.
-
-**Fix direction**: path-aware custom routes. The routing table already
-supports `path_prefix` (the ChatGPT route uses `/backend-api`), so paude
-could emit host+path routes — anthropic's `x-api-key` for `/v1/messages`,
-openai's `Bearer` for the rest — making one host serve both protocols
-with no gateway assumptions. Needs a paude-proxy change (verify
-`path_prefix` interacts with first-match the way this assumes) plus a
-paude-side change in `build_credential_routes_config`, and a decision on
-whether the same-host rejection should be relaxed for providers whose
-host env values are identical at create time.
+The existing pinned proxy already implements the required path-prefix matching;
+no proxy update or credential-value comparison is needed. Generated routes were
+verified through the pinned proxy against a local HTTPS upstream, including
+path-segment boundaries and both shared and different provider keys. Ambiguous
+host-only mappings and conflicts with live built-in credentials remain rejected.
 
 ### FEATURE-003: Same-host credential guard misses custom-vs-default route collisions
 

@@ -229,10 +229,10 @@ Opt-in OpenClaw plugin aliases, for skill packages that talk to external service
 
 ## Credential Domains and Custom Environment
 
-Two `paude create` flags (CLI only; not read from config files) cover routing
+Two `paude create` flags cover routing
 an agent through a custom API endpoint such as a company AI gateway:
 
-- `--credential-domain PROVIDER=HOST[:PORT]` (repeatable) makes the proxy
+- `--credential-domain PROVIDER=HOST[:PORT][/PATH_PREFIX]` (repeatable) makes the proxy
   inject the provider's API key for `HOST` as well as the provider's own
   domains. The provider must be one the session configures (e.g. via
   `--provider anthropic`). `HOST` is added to the allowlist even when
@@ -242,6 +242,33 @@ an agent through a custom API endpoint such as a company AI gateway:
 - `--env KEY=VALUE` / `--env KEY` (repeatable) sets an env var in the agent
   container; the bare form copies the host value. Credentials and
   paude-managed variables are rejected.
+
+Credential routes can also be a list under `create.credential-domain` in
+`paude.json`. CLI `--credential-domain` options replace the project list when
+present. There is no user-default setting for credential domains; `--env` remains
+CLI-only. For example:
+
+```json
+{
+  "create": {
+    "agent": "opencode_v2",
+    "providers": ["anthropic", "openai"],
+    "credential-domain": [
+      "anthropic=example.com/v1/messages",
+      "openai=example.com/v1"
+    ]
+  }
+}
+```
+
+Distinct explicit path prefixes allow multiple providers on one custom host.
+Longer prefixes win regardless of list order, using path-segment boundaries:
+`/v1/messages` matches itself and its descendants, not `/v1/messages-other`.
+A trailing slash matches descendants only. Prefixes are literal, without glob
+patterns, percent escapes, queries, or fragments. Identical prefixes with different
+credentials and ambiguous host-only combinations are rejected. Protection against
+shadowing another credential's live built-in domain remains in effect. Ports do
+not distinguish credential routes, although nonstandard ports must be allowed.
 
 Both are recorded on the session and carried through `start`,
 `allowed-domains`/`allowed-endpoints` updates and `upgrade`.

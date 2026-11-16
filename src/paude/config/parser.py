@@ -124,6 +124,7 @@ def _parse_paude_json(config_file: Path, data: dict[str, Any]) -> PaudeConfig:
         setup_command=setup_command,
         create_allowed_domains=create_hints.allowed_domains,
         create_allowed_endpoints=create_hints.allowed_endpoints,
+        create_credential_domains=create_hints.credential_domains,
         create_agent_configs=config_paths(
             data.get("create", {}).get("agent-configs", {}), config_dir
         )
@@ -141,6 +142,7 @@ def _parse_paude_json(config_file: Path, data: dict[str, Any]) -> PaudeConfig:
 _KNOWN_CREATE_KEYS = {
     "allowed-domains",
     "allowed-endpoints",
+    "credential-domain",
     "agent",
     "provider",
     "agents",
@@ -157,6 +159,7 @@ class CreateHints:
 
     allowed_domains: list[str] = field(default_factory=list)
     allowed_endpoints: list[str] = field(default_factory=list)
+    credential_domains: list[str] = field(default_factory=list)
     agent: str | None = None
     provider: str | None = None
     agents: list[str] = field(default_factory=list)
@@ -209,6 +212,7 @@ def _parse_create_section(create_data: dict[str, Any]) -> CreateHints:
     return CreateHints(
         allowed_domains=allowed_domains,
         allowed_endpoints=allowed_endpoints,
+        credential_domains=_string_list(create_data.get("credential-domain", [])),
         agent=agent,
         provider=provider,
         agents=agents,

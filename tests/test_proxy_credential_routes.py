@@ -200,3 +200,109 @@ class TestBuildConfig:
         validate_credential_domain_specs(
             ["anthropic=a.example.com:443", "openai=b.example.com:443"]
         )
+
+
+class TestPathCredentialRoutes:
+    @pytest.mark.parametrize(
+        ("target", "expected"),
+        [
+            ("GW.Example.com./v1/messages", "gw.example.com:443/v1/messages"),
+            ("gw.example.com:8443/v1/", "gw.example.com:8443/v1/"),
+            ("[::1]/v1", "[::1]:443/v1"),
+            ("gw.example.com/", "gw.example.com:443/"),
+        ],
+    )
+    def test_normalizes_authority_and_preserves_path(self, target, expected):
+        assert parse_credential_domains([f"anthropic={target}"], ["anthropic"]) == [
+            f"anthropic={expected}"
+        ]
+
+    @pytest.mark.parametrize(
+        "path",
+        ["/v1?x=1", "/v1#fragment", "/v1/*", "/v1/a b", "/v1/%2F", "/v1\\messages"],
+    )
+    def test_rejects_nonliteral_prefix(self, path):
+        with pytest.raises(ValueError, match="literal prefix"):
+            parse_credential_domains([f"anthropic=example.com{path}"], ["anthropic"])
+
+    def test_hosts_and_endpoints_exclude_paths(self):
+        specs = parse_credential_domains(
+            [
+                "anthropic=GW.example.com:8443/v1/messages",
+                "openai=gw.example.com:8443/v1",
+                "openai=standard.example.com/v1",
+            ],
+            ["anthropic", "openai"],
+        )
+        assert credential_domain_hosts(specs) == [
+            "gw.example.com",
+            "standard.example.com",
+        ]
+        assert credential_domain_endpoints(specs) == ["gw.example.com:8443"]
+
+    @pytest.mark.parametrize("reverse", [False, True])
+    def test_nested_prefixes_are_most_specific_first(self, reverse):
+        specs = ["openai=example.com:443/v1", "anthropic=example.com:443/v1/messages"]
+        if reverse:
+            specs.reverse()
+        config = build_credential_routes_config(
+            specs,
+            {
+                "ANTHROPIC_API_KEY": "shared-value",
+                "OPENAI_API_KEY": "shared-value",
+            },
+        )
+        specific, fallback = config["credentials"][:2]
+        assert specific == {
+            "env_var": "ANTHROPIC_API_KEY",
+            "injector": "api_key",
+            "domains": ["example.com"],
+            "params": {"header_name": "x-api-key", "path_prefix": "/v1/messages"},
+        }
+        assert fallback == {
+            "env_var": "OPENAI_API_KEY",
+            "injector": "bearer",
+            "domains": ["example.com"],
+            "params": {"path_prefix": "/v1"},
+        }
+        assert config["credentials"][2:] == DEFAULT_CREDENTIAL_ROUTES
+        assert "shared-value" not in str(config)
+        validate_credential_domain_specs(specs)
+
+    @pytest.mark.parametrize("prefixes", [("/v1", "/v1"), ("", "/v1"), ("/v1", "")])
+    def test_ambiguous_paths_still_rejected(self, prefixes):
+        specs = [
+            f"anthropic=example.com:443{prefixes[0]}",
+            f"openai=example.com:443{prefixes[1]}",
+        ]
+        with pytest.raises(ValueError, match="distinct explicit path"):
+            build_credential_routes_config(specs)
+        with pytest.raises(ValueError, match="distinct explicit path"):
+            validate_credential_domain_specs(specs)
+
+    def test_distinct_paths_on_different_ports_share_host(self):
+        build_credential_routes_config(
+            [
+                "anthropic=example.com:443/anthropic",
+                "openai=example.com:8443/openai",
+            ]
+        )
+
+    def test_identical_path_on_different_ports_still_ambiguous(self):
+        with pytest.raises(ValueError, match="first matching credential"):
+            build_credential_routes_config(
+                [
+                    "anthropic=example.com:443/v1",
+                    "openai=example.com:8443/v1",
+                ]
+            )
+
+    def test_path_does_not_bypass_builtin_protection(self):
+        with pytest.raises(ValueError, match="a built-in route"):
+            build_credential_routes_config(
+                [
+                    "anthropic=chatgpt.com:443/v1/messages",
+                    "openai=chatgpt.com:443/v1",
+                ],
+                {"OPENAI_API_KEY": "value"},
+            )

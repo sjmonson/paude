@@ -1792,6 +1792,45 @@ class TestCredentialRoutes:
         }
         assert self._routes_written(runner) == []
 
+    @pytest.mark.parametrize("engine", ["podman", "docker"])
+    def test_recreate_preserves_path_routes(self, engine: str) -> None:
+        runner, manager = self._manager(engine)
+        paths = [
+            "openai=gw.example.com:443/v1",
+            "anthropic=gw.example.com:443/v1/messages",
+        ]
+        with (
+            patch.object(
+                manager,
+                "get_config_from_labels",
+                return_value=(
+                    "proxy:latest",
+                    ["gw.example.com"],
+                    [],
+                    [],
+                    paths,
+                ),
+            ),
+            patch(
+                "paude.backends.podman.proxy.get_podman_machine_dns", return_value=None
+            ),
+            patch("paude.container.volume.VolumeManager"),
+        ):
+            manager.start_if_needed(
+                "s",
+                credentials={
+                    "ANTHROPIC_API_KEY": "test-value",
+                    "OPENAI_API_KEY": "test-value",
+                },
+            )
+        (config,) = self._routes_written(runner)
+        routes = config["credentials"]
+        assert isinstance(routes, list)
+        assert routes[0]["params"]["path_prefix"] == "/v1/messages"
+        assert routes[1]["params"]["path_prefix"] == "/v1"
+        assert routes[0]["injector"] == "api_key"
+        assert routes[1]["injector"] == "bearer"
+
     def _update_manager(
         self, prepared: PreparedProxyCredentials, spec: str
     ) -> tuple[PodmanProxyManager, MagicMock, MagicMock]:
@@ -1809,6 +1848,26 @@ class TestCredentialRoutes:
         proxy_runner = MagicMock()
         manager._proxy_runner = proxy_runner
         return manager, credentials, proxy_runner
+
+    @patch("paude.backends.podman.proxy._get_host_dns", return_value=None)
+    def test_credential_refresh_retains_path_routes(self, mock_dns: MagicMock) -> None:
+        prepared = PreparedProxyCredentials(
+            credentials=ProxyCredentials(),
+            secret_refs=[
+                "saved,type=env,target=ANTHROPIC_API_KEY",
+                "new,type=env,target=OPENAI_API_KEY",
+            ],
+        )
+        paths = [
+            "openai=gw.example.com:443/v1",
+            "anthropic=gw.example.com:443/v1/messages",
+        ]
+        manager, _, proxy_runner = self._update_manager(prepared, paths[0])
+        manager.get_config_from_labels = MagicMock(  # type: ignore[method-assign]
+            return_value=("proxy:latest", ["gw.example.com"], [], [], paths)
+        )
+        manager.update_domains("s", None, credentials={"OPENAI_API_KEY": "new-value"})
+        proxy_runner.swap_session_proxy.assert_called_once()
 
     @patch("paude.backends.podman.proxy._get_host_dns", return_value=None)
     def test_update_rejects_refresh_that_revives_builtin_route(

@@ -2078,20 +2078,32 @@ class TestPodmanPortUrls:
 class TestSessionLabelPersistence:
     """Tests for session label round-tripping (agents, providers)."""
 
-    def test_extra_env_and_credential_domains_round_trip(self) -> None:
+    @pytest.mark.parametrize(
+        "routes",
+        [
+            ["anthropic=gw.example.com:443"],
+            [
+                "anthropic=gw.example.com:443/v1/messages",
+                "openai=gw.example.com:443/v1",
+            ],
+        ],
+    )
+    def test_extra_env_and_credential_domains_round_trip(
+        self, routes: list[str]
+    ) -> None:
         from paude.backends.labels import spec_from_labels
 
         config = SessionConfig(
             name="s",
             workspace=Path("/tmp/ws"),
             image="img",
-            credential_domains=["anthropic=gw.example.com:443"],
+            credential_domains=routes,
             extra_env=["ANTHROPIC_BASE_URL=https://gw.example.com", "A=b,c"],
         )
         labels = SessionSetup.build_session_labels(config, "s", "2026-01-01")
 
         spec = spec_from_labels(labels)
-        assert spec.credential_domains == ["anthropic=gw.example.com:443"]
+        assert spec.credential_domains == routes
         assert spec.extra_env == ["ANTHROPIC_BASE_URL=https://gw.example.com", "A=b,c"]
 
     def test_no_extra_env_or_routes_writes_no_labels(self) -> None:

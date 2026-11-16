@@ -68,6 +68,9 @@ class ResolvedCreateOptions:
     otel_endpoint: SettingValue[str | None] = field(
         default_factory=lambda: SettingValue(None, "built-in")
     )
+    credential_domains: SettingValue[list[str]] = field(
+        default_factory=lambda: SettingValue([], "built-in")
+    )
     agent_configs: dict[str, AgentConfigSnapshot] = field(default_factory=dict)
     agents: list[str] = field(default_factory=lambda: ["claude"])
     agents_provenance: list[tuple[list[str], Source]] = field(default_factory=list)
@@ -101,6 +104,7 @@ def resolve_create_options(
     cli_allowed_domains: list[str] | None,
     cli_allowed_endpoints: list[str] | None = None,
     cli_otel_endpoint: str | None = None,
+    cli_credential_domains: list[str] | None = None,
     project_config: PaudeConfig | None,
     user_defaults: UserDefaults,
 ) -> ResolvedCreateOptions:
@@ -205,6 +209,12 @@ def resolve_create_options(
         user_defaults=user_defaults,
     )
 
+    result.credential_domains = _resolve_scalar(
+        cli=cli_credential_domains,
+        project=project_config.create_credential_domains if project_config else None,
+        user=None,
+        builtin=[],
+    )
     result.agent_configs = resolve_agent_configs(
         result.agents,
         user_defaults.agent_configs,

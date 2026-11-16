@@ -117,18 +117,44 @@ paude create gw-session --provider anthropic \
   -a '--model gw-sonnet'
 ```
 
-`--credential-domain PROVIDER=HOST[:PORT]` adds the host to the session's
+`--credential-domain PROVIDER=HOST[:PORT][/PATH_PREFIX]` adds the host to the session's
 allowlist (and a non-443 port to its allowed endpoints) automatically. The key
 still lives only on the proxy sidecar; the agent sees the
 `paude-proxy-managed` sentinel. Both flags are recorded on the session and
 survive `start`, `allowed-domains` updates and `upgrade`.
 
-Each host can receive only one provider's credential — the proxy injects the
-first matching route, so routing two providers to the same host, or to a host
-a built-in route already feeds with a credential the session holds (the
-proxy skips routes whose env var is unset), is rejected at create time and
-on later proxy rebuilds. Give each provider its own gateway hostname (e.g.
-`anthropic-gw.example.com` and `openai-gw.example.com`).
+Providers can share a custom host using distinct explicit path prefixes. Longer
+prefixes win regardless of configuration order: `/v1/messages` selects Anthropic
+and `/v1` handles other OpenAI-style requests. Prefixes match complete path
+segments, so `/v1/messages` also matches `/v1/messages/count_tokens`, but not
+`/v1/messages-other`. Paths are literal (no glob patterns, percent escapes,
+queries, or fragments). Host-only combinations remain ambiguous and are rejected,
+as are identical paths assigned to different credentials. Conflicts with another
+credential's live built-in domain remain rejected.
+
+Set the routes in `paude.json` or use repeatable CLI flags. CLI flags replace the
+project list when supplied; user defaults do not configure credential domains:
+
+```json
+{
+  "create": {
+    "agent": "opencode_v2",
+    "providers": ["anthropic", "openai"],
+    "agent-configs": {"opencode_v2": "paude/opencode.jsonc"},
+    "credential-domain": [
+      "anthropic=example.com/v1/messages",
+      "openai=example.com/v1"
+    ]
+  }
+}
+```
+
+For a gateway using one key for both API styles, set `ANTHROPIC_API_KEY` and
+`OPENAI_API_KEY` to that key on the host. Anthropic routes inject `x-api-key`;
+OpenAI routes inject `Authorization: Bearer`. Both OpenCode provider base URLs
+can remain `https://example.com/v1`. Explicit path routing also works when the
+providers use different keys. Credential matching is by hostname and path;
+ports affect network access, not credential selection.
 
 A gateway that requires `Authorization: Bearer` instead of `x-api-key`: use
 `--provider anthropic-oauth` with the token exported as

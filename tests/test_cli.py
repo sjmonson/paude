@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -2751,3 +2752,61 @@ def test_agent_config_project_defaults_and_cli_override(tmp_path: Path) -> None:
     )
     assert result.exit_code == 0, result.output
     assert str(path) in result.output
+
+
+@pytest.mark.parametrize("cli_override", [False, True])
+def test_project_credential_domains_and_cli_override(tmp_path, cli_override):
+    routes = ["openai=example.com:8443/v1", "anthropic=example.com:8443/v1/messages"]
+    (tmp_path / "paude.json").write_text(
+        json.dumps(
+            {
+                "create": {
+                    "agent": "opencode_v2",
+                    "providers": ["anthropic", "openai"],
+                    "credential-domain": routes,
+                }
+            }
+        )
+    )
+    args = ["create", "--dry-run"]
+    if cli_override:
+        args += ["--credential-domain", "openai=override.example.com/v1"]
+    result = runner.invoke(app, args)
+    output = strip_ansi(result.output)
+    assert result.exit_code == 0, output
+    if cli_override:
+        assert "openai key -> override.example.com:443/v1 (cli)" in output
+        assert "anthropic key -> example.com" not in output
+        assert "allowed-endpoints: (none)" in output
+    else:
+        assert "openai key -> example.com:8443/v1 (paude.json)" in output
+        assert "anthropic key -> example.com:8443/v1/messages (paude.json)" in output
+        assert "allowed-endpoints: example.com:8443" in output
+        domains = output.split("allowed-domains:", 1)[1].splitlines()[0]
+        assert "example.com" in domains
+        assert "/v1" not in domains
+
+
+def test_project_credential_domains_reach_session_config(tmp_path):
+    routes = ["anthropic=example.com/v1/messages", "openai=example.com/v1"]
+    (tmp_path / "paude.json").write_text(
+        json.dumps(
+            {
+                "create": {
+                    "agent": "opencode_v2",
+                    "providers": ["anthropic", "openai"],
+                    "credential-domain": routes,
+                }
+            }
+        )
+    )
+    with (
+        patch("paude.cli.create_podman.create_podman_session") as create,
+        patch("paude.providers.check_required_secrets"),
+    ):
+        result = runner.invoke(app, ["create", "gateway"])
+    assert result.exit_code == 0, result.output
+    assert create.call_args.kwargs["credential_domains"] == [
+        "anthropic=example.com:443/v1/messages",
+        "openai=example.com:443/v1",
+    ]

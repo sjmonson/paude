@@ -145,7 +145,8 @@ def _show_resolved_flags(
 
     for spec in flags.get("credential_domains") or []:
         provider, authority = split_credential_domain(spec)
-        typer.echo(f"  credential-domain: {provider} key -> {authority}")
+        source = resolved.credential_domains.source
+        typer.echo(f"  credential-domain: {provider} key -> {authority} ({source})")
 
 
 def _show_agents_and_providers(resolved: ResolvedCreateOptions) -> None:
