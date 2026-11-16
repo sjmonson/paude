@@ -23,6 +23,7 @@ class UserDefaults:
     provider: str | None = None
     agents: list[str] = field(default_factory=list)
     providers: list[str] = field(default_factory=list)
+    agent_configs: dict[str, str] = field(default_factory=dict)
     agent_providers: dict[str, str] = field(default_factory=dict)
     yolo: bool | None = None
     git: bool | None = None
@@ -41,6 +42,7 @@ _KNOWN_KEYS = {
     "agents",
     "providers",
     "agent-providers",
+    "agent-configs",
     "yolo",
     "git",
     "platform",
@@ -117,7 +119,10 @@ def _warn_unknown_keys(
 
 def _parse_defaults(data: dict[str, Any], path: Path) -> UserDefaults:
     """Parse the 'defaults' object into a UserDefaults dataclass."""
+    from paude.config.agent_configs import config_paths
+
     return UserDefaults(
+        agent_configs=config_paths(data.get("agent-configs", {}), path.parent),
         backend=data.get("backend"),
         agent=data.get("agent"),
         provider=data.get("provider"),

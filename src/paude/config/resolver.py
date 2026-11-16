@@ -6,6 +6,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any, Generic, Literal, TypeVar
 
+from paude.config.agent_configs import AgentConfigSnapshot, resolve_agent_configs
 from paude.config.models import PaudeConfig
 from paude.config.user_config import UserDefaults
 
@@ -67,6 +68,7 @@ class ResolvedCreateOptions:
     otel_endpoint: SettingValue[str | None] = field(
         default_factory=lambda: SettingValue(None, "built-in")
     )
+    agent_configs: dict[str, AgentConfigSnapshot] = field(default_factory=dict)
     agents: list[str] = field(default_factory=lambda: ["claude"])
     agents_provenance: list[tuple[list[str], Source]] = field(default_factory=list)
     providers: list[str] = field(default_factory=list)
@@ -91,6 +93,7 @@ def resolve_create_options(
     cli_agents: list[str] | None = None,
     cli_providers: list[str] | None = None,
     cli_agent_providers: dict[str, str] | None = None,
+    cli_agent_configs: dict[str, str] | None = None,
     cli_yolo: bool | None,
     cli_git: bool | None,
     cli_platform: str | None,
@@ -202,6 +205,12 @@ def resolve_create_options(
         user_defaults=user_defaults,
     )
 
+    result.agent_configs = resolve_agent_configs(
+        result.agents,
+        user_defaults.agent_configs,
+        project_config.create_agent_configs if project_config else {},
+        cli_agent_configs or {},
+    )
     return result
 
 

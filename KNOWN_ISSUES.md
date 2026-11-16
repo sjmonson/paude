@@ -1135,3 +1135,19 @@ Note: README's agent table/examples were not re-audited as part of the 2026-07-3
 **Discovered**: 2026-07-31 during docs/ audit (`docs/CONFIGURATION.md`)
 
 Gas City no longer contributes a standalone alias. Its resolved child-agent composition contributes the Claude/Gemini domains when those children are installed.
+
+
+### AGENT-005: Existing OpenCode integration omits credential backup exclusions
+
+**Status**: Open
+**Priority**: High
+**Discovered**: 2026-11-16 while adding the separate OpenCode V2 integration
+
+`agents/opencode.py` does not declare `credential_file_names`, although its
+persistent `.local/share/opencode` directory can contain `auth.json` and
+`mcp-auth.json`. A user who signs in inside that existing integration can
+therefore include live credentials in `paude backup`. Reproduce by putting a
+non-secret test credential in either file and inspecting a backup archive.
+Declare the credential exclusions and test backup contents. The new
+`opencode_v2` integration separately excludes these files; this issue tracks
+the existing integration only.

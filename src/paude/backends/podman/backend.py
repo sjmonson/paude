@@ -142,6 +142,9 @@ class PodmanBackend:
             config, name, composition, vname, volume_reused
         )
         try:
+            from paude.container.agent_configs import seed_agent_configs
+
+            seed_agent_configs(self._engine, config.image, vname, config.agent_configs)
             self._setup.create_session_container(
                 config,
                 cname,

@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from paude.config.agent_configs import config_paths
 from paude.config.models import PaudeConfig
 from paude.config.user_config import _string_list, _warn_unknown_keys
 
@@ -123,6 +124,11 @@ def _parse_paude_json(config_file: Path, data: dict[str, Any]) -> PaudeConfig:
         setup_command=setup_command,
         create_allowed_domains=create_hints.allowed_domains,
         create_allowed_endpoints=create_hints.allowed_endpoints,
+        create_agent_configs=config_paths(
+            data.get("create", {}).get("agent-configs", {}), config_dir
+        )
+        if isinstance(data.get("create", {}), dict)
+        else {},
         create_agent=create_hints.agent,
         create_provider=create_hints.provider,
         create_agents=create_hints.agents,
@@ -140,6 +146,7 @@ _KNOWN_CREATE_KEYS = {
     "agents",
     "providers",
     "agent-providers",
+    "agent-configs",
     "otel-endpoint",
 }
 

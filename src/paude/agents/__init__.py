@@ -15,6 +15,7 @@ from paude.agents.gascity import GascityAgent
 from paude.agents.gemini import GeminiAgent
 from paude.agents.openclaw import OpenClawAgent
 from paude.agents.opencode import OpenCodeAgent
+from paude.agents.opencode_v2 import OpenCodeV2Agent
 
 __all__ = [
     "Agent",
@@ -26,6 +27,7 @@ __all__ = [
     "GascityAgent",
     "GeminiAgent",
     "OpenCodeAgent",
+    "OpenCodeV2Agent",
     "OpenClawAgent",
     "dockerfile_install_lines_for_agent",
     "dockerfile_install_lines_for_composition",
@@ -42,6 +44,7 @@ _REGISTRY: dict[str, type] = {
     "gascity": GascityAgent,
     "gemini": GeminiAgent,
     "opencode": OpenCodeAgent,
+    "opencode_v2": OpenCodeV2Agent,
     "openclaw": OpenClawAgent,
 }
 

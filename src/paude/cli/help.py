@@ -241,7 +241,8 @@ _SECTIONS: tuple[HelpSection, ...] = (
             "User defaults: ~/.config/paude/defaults.json"
             " (backend, yolo, git, domains, etc.)\n"
             'Project hints: paude.json "create" section'
-            " (allowed-domains, allowed-endpoints, agent, provider, agents,"
+            " (allowed-domains, allowed-endpoints, agent, provider, agent-configs,"
+            " agents,"
             " providers, agent-providers)"
         ),
     ),
@@ -271,6 +272,11 @@ _SECTIONS: tuple[HelpSection, ...] = (
             ("--agent gascity", "Gas City (multi-agent orchestration)"),
             ("--agent gemini", "Gemini CLI"),
             ("--agent opencode", "OpenCode"),
+            ("--agent opencode_v2", "OpenCode V2 (Anthropic, OpenAI, Vertex)"),
+            (
+                "--agent-config a=path",
+                "Snapshot base JSON/JSONC config (opencode_v2); repeatable",
+            ),
             ("--agent openclaw", "OpenClaw (web UI on port 18789)"),
             (
                 "--agents a,b,c",

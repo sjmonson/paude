@@ -430,3 +430,21 @@ paude create --dry-run
 # Force rebuild after changing config
 paude create --rebuild
 ```
+
+## Agent base configuration
+
+Use `create.agent-configs` in `paude.json`, `defaults.agent-configs` in the user
+configuration, or repeat `--agent-config AGENT=PATH` at creation. Initially only
+`opencode_v2` has a handler. CLI > project > user defaults applies per agent.
+Paths in configuration files resolve relative to the containing file; CLI paths
+resolve from the working directory. Values must name readable JSON/JSONC objects.
+
+The contents are snapshotted into the session volume, never the image or container
+labels. The original host path is not needed for restart, rebuild, or restore.
+For OpenCode V2, the snapshot overrides generated provider defaults recursively
+(arrays replace), then project configuration overrides global defaults. Paude
+manages update disabling separately, and `--yolo` auto-approves requests that are
+not explicitly denied. Existing global configuration and session-side edits are
+preserved. Referenced assets are not imported. Use paude's provider credential
+mechanism rather than putting secrets in a base configuration: the configuration
+itself is copied as supplied and included in volume backups.

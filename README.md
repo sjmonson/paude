@@ -13,6 +13,7 @@ Run AI coding agents in secure containers. They make commits, you pull them back
 | [Gemini CLI](https://github.com/google-gemini/gemini-cli) | `--agent gemini` | Supported |
 | [OpenClaw](https://github.com/openclaw/openclaw) | `--agent openclaw` | Supported |
 | [OpenCode](https://opencode.ai) | `--agent opencode` | Supported |
+| [OpenCode V2](https://opencode.ai/docs/) | `--agent opencode_v2` | Supported |
 
 > Agents are installed automatically inside the container — no local agent installation needed. You just need authentication credentials for your chosen provider.
 
@@ -603,3 +604,47 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, testing, and relea
 ## License
 
 MIT
+
+### OpenCode V2 base configuration
+
+```bash
+paude create --agent opencode_v2 --provider anthropic \
+  --agent-config opencode_v2=./opencode-base.jsonc
+```
+
+OpenCode V2 supports Anthropic (default), OpenAI API keys, and Vertex through
+paude's credential proxy. It runs with a private server. V1 sessions are not
+migrated.
+
+`--agent-config AGENT=PATH` is repeatable. Only `opencode_v2` currently supports
+base configuration. Files may contain JSON or JSONC comments and trailing commas.
+You can also set `create.agent-configs` in `paude.json`:
+
+```json
+{
+  "create": {
+    "agent": "opencode_v2",
+    "agent-configs": {"opencode_v2": "./opencode-base.jsonc"}
+  }
+}
+```
+
+The same `agent-configs` map is supported under `defaults` in paude's user
+configuration. Each agent's CLI path overrides its project path, which overrides
+its user default. Relative CLI paths resolve from the working directory;
+configuration-file paths resolve from that file's directory. `~` is expanded.
+Mappings for unselected agents or agents without a handler are rejected.
+
+Paude snapshots the file into the private session volume at creation, including
+for SSH sessions. Host edits or deletion do not affect existing sessions.
+Generated provider defaults merge recursively beneath the supplied settings;
+arrays are replaced. OpenCode project settings override the resulting global
+configuration. Paude disables updates through managed system configuration.
+`--yolo` enables auto-approval while retaining explicit permission denies.
+
+Only the configuration file is imported: referenced assets must exist inside the
+session. Environment placeholders resolve inside the container. Supply provider
+credentials through paude's normal credential mechanism; configuration contents
+are copied as supplied and included in backups. The source file is never modified,
+and dry-run prints only paths and provenance. Later session-side edits survive
+restart, rebuild, and restore.

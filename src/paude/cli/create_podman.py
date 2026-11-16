@@ -21,6 +21,7 @@ from paude.cli.session_rebuild import (
     prepare_session_mounts,
     session_config_from_spec,
 )
+from paude.config.agent_configs import AgentConfigSnapshot
 from paude.config.models import PaudeConfig
 from paude.subprocess_utils import called_process_stderr
 
@@ -50,6 +51,7 @@ def create_podman_session(
     provider_name: str | None = None,
     agent_providers: list[tuple[str, str]] | None = None,
     credential_providers: list[str] | None = None,
+    agent_configs: dict[str, AgentConfigSnapshot] | None = None,
     engine_binary: str = "podman",
     ssh_host: str | None = None,
     ssh_key: str | None = None,
@@ -106,6 +108,8 @@ def create_podman_session(
         args=parsed_args,
         workdir=str(workspace),
     )
+
+    session_config.agent_configs = agent_configs or {}
 
     backend_instance, session = _create_session_or_exit(
         engine, session_config, prepared.remote_config

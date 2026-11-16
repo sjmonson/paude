@@ -64,7 +64,7 @@ AgentOption = Annotated[
         "--agent",
         help=(
             "Agent to use: claude (default), codex, cursor, gascity, "
-            "gemini, openclaw, opencode. Alias for a single-item --agents."
+            "gemini, openclaw, opencode, opencode_v2. Alias for a single-item --agents."
         ),
     ),
 ]

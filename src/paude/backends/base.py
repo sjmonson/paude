@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Protocol
 
 from paude.backends.port_forward_utils import ForwardPort
+from paude.config.agent_configs import AgentConfigSnapshot
 
 if TYPE_CHECKING:
     from paude.backends.proxy_credential_refresh import ProxyCredentialStatus
@@ -95,6 +96,7 @@ class SessionConfig:
     agent_providers: list[tuple[str, str]] = field(default_factory=list)
     credential_providers: list[str] = field(default_factory=list)
     gpu: str | None = None
+    agent_configs: dict[str, AgentConfigSnapshot] = field(default_factory=dict)
     reuse_volume: bool = False
     ports: list[tuple[int, int]] = field(default_factory=list)
     otel_ports: list[int] = field(default_factory=list)

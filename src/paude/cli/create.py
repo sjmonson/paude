@@ -94,6 +94,12 @@ def session_create(
     provider: ProviderOption = None,
     providers: ProvidersOption = None,
     agent_provider: AgentProviderOption = None,
+    agent_config: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--agent-config", help="Base configuration as AGENT=PATH (repeatable)."
+        ),
+    ] = None,
     git: Annotated[
         bool | None,
         typer.Option(
@@ -146,7 +152,11 @@ def session_create(
     workspace = Path.cwd()
 
     # Load user defaults
-    user_defaults = load_user_defaults()
+    try:
+        user_defaults = load_user_defaults()
+    except ValueError as e:
+        typer.echo(f"Error: {e}", err=True)
+        raise typer.Exit(1) from None
 
     # Detect and parse project config
     config_file = detect_config(workspace)
@@ -169,6 +179,9 @@ def session_create(
 
     # Resolve layered configuration
     try:
+        from paude.config.agent_configs import parse_config_options
+
+        cli_agent_configs = parse_config_options(agent_config)
         cli_agent_providers = _parse_agent_provider_options(agent_provider)
         resolved = resolve_create_options(
             cli_backend=backend.value if backend is not None else None,
@@ -177,6 +190,7 @@ def session_create(
             cli_agents=cli_agents,
             cli_providers=cli_providers,
             cli_agent_providers=cli_agent_providers,
+            cli_agent_configs=cli_agent_configs,
             cli_yolo=yolo,
             cli_git=git,
             cli_platform=platform,
@@ -352,6 +366,7 @@ def session_create(
         agent_name=r_agent,
         provider_name=r_provider,
         agent_providers=resolved.agent_providers,
+        agent_configs=resolved.agent_configs,
         credential_providers=resolved.providers,
         engine_binary=r_backend.value,
         ssh_host=parsed_ssh_host,

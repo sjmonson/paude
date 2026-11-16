@@ -2662,3 +2662,92 @@ class TestPrepareSessionCreateExtraEnvAndRoutes:
         )
         assert domains == []
         assert unrestricted
+
+
+def test_agent_config_dry_run_redacts_contents(tmp_path: Path) -> None:
+    config = tmp_path / "base.jsonc"
+    config.write_text('{// comment\n"model":"SECRET-CONTENT",}')
+    result = runner.invoke(
+        app,
+        [
+            "create",
+            "--agent",
+            "opencode_v2",
+            "--agent-config",
+            f"opencode_v2={config}",
+            "--dry-run",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert str(config) in result.output
+    assert "(cli)" in result.output
+    assert "SECRET-CONTENT" not in result.output
+
+
+@pytest.mark.parametrize("option", ["bad", "claude=/missing", "opencode_v2=/missing"])
+def test_agent_config_invalid_before_build(option: str) -> None:
+    with patch("paude.cli.create_podman.build_session_images") as build:
+        result = runner.invoke(
+            app,
+            [
+                "create",
+                "--agent",
+                "opencode_v2",
+                "--agent-config",
+                option,
+            ],
+        )
+    assert result.exit_code == 1
+    build.assert_not_called()
+
+
+def test_agent_config_payload_reaches_session_creation(tmp_path: Path) -> None:
+    path = tmp_path / "base.jsonc"
+    path.write_text('{"model":"anthropic/custom"}')
+    with (
+        patch("paude.cli.create_podman.create_podman_session") as create,
+        patch("paude.providers.check_required_secrets"),
+    ):
+        result = runner.invoke(
+            app,
+            [
+                "create",
+                "test",
+                "--agent",
+                "opencode_v2",
+                "--agent-config",
+                f"opencode_v2={path}",
+            ],
+        )
+    assert result.exit_code == 0, result.output
+    snapshot = create.call_args.kwargs["agent_configs"]["opencode_v2"]
+    path.unlink()
+    assert '"model": "anthropic/custom"' in snapshot.content
+
+
+def test_agent_config_project_defaults_and_cli_override(tmp_path: Path) -> None:
+    import json
+
+    path = tmp_path / "base.json"
+    path.write_text('{"model":"anthropic/custom"}')
+    (tmp_path / "paude.json").write_text(
+        json.dumps(
+            {
+                "create": {
+                    "agent": "opencode_v2",
+                    "agent-configs": {"opencode_v2": "missing.json"},
+                }
+            }
+        )
+    )
+    result = runner.invoke(
+        app,
+        [
+            "create",
+            "--agent-config",
+            f"opencode_v2={path}",
+            "--dry-run",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert str(path) in result.output

@@ -41,6 +41,7 @@ class PaudeConfig:
     create_provider: str | None = None
     create_agents: list[str] = field(default_factory=list)
     create_providers: list[str] = field(default_factory=list)
+    create_agent_configs: dict[str, str] = field(default_factory=dict)
     create_agent_providers: dict[str, str] = field(default_factory=dict)
     create_otel_endpoint: str | None = None
 

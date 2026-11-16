@@ -105,6 +105,8 @@ def _show_resolved_flags(
     typer.echo(format_setting("backend", resolved.backend))
     typer.echo(f"  verbose: {flags.get('verbose', False)}")
     _show_agents_and_providers(resolved)
+    for name, snapshot in resolved.agent_configs.items():
+        typer.echo(f"  agent-config {name}: {snapshot.path} ({snapshot.source})")
     typer.echo(format_setting("yolo", resolved.yolo))
     typer.echo(format_setting("git", resolved.git))
 
