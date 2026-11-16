@@ -6,8 +6,8 @@ from pathlib import Path
 from subprocess import CompletedProcess
 from unittest.mock import MagicMock, patch
 
-import click.exceptions
 import pytest
+import typer
 
 from paude.workflow import (
     _get_container_branch,
@@ -37,7 +37,7 @@ class TestGetContainerBranch:
         mock_backend = MagicMock()
         mock_backend.exec_in_session.return_value = (1, "", "error\n")
 
-        with pytest.raises(click.exceptions.Exit):
+        with pytest.raises(typer.Exit):
             _get_container_branch(mock_backend, "my-session")
 
     def test_defaults_to_workspace_path(self) -> None:
@@ -87,7 +87,7 @@ class TestValidateHarvestBranch:
         ["main", "master", "release", "release-1.0", "release/v2"],
     )
     def test_rejects_protected_branches(self, branch: str) -> None:
-        with pytest.raises(click.exceptions.Exit):
+        with pytest.raises(typer.Exit):
             _validate_harvest_branch(branch)
 
 
@@ -371,7 +371,7 @@ class TestHarvestSession:
             ("api-two", "ext::podman exec -i paude-test %S /pvc/two"),
         ]
 
-        with pytest.raises(click.exceptions.Exit):
+        with pytest.raises(typer.Exit):
             harvest_session("test", source_branch="feature/foo")
 
         assert "Multiple remotes" in capsys.readouterr().err
@@ -380,7 +380,7 @@ class TestHarvestSession:
     def test_harvest_session_not_found(self, mock_find: MagicMock) -> None:
         mock_find.return_value = None
 
-        with pytest.raises(click.exceptions.Exit):
+        with pytest.raises(typer.Exit):
             harvest_session("missing", "my-branch")
 
     @patch("paude.cli.find_session_backend")
@@ -391,7 +391,7 @@ class TestHarvestSession:
         mock_backend.get_session.return_value = mock_session
         mock_find.return_value = ("podman", mock_backend)
 
-        with pytest.raises(click.exceptions.Exit):
+        with pytest.raises(typer.Exit):
             harvest_session("test", "my-branch")
 
     @patch("paude.git_remote.git_fetch_from_remote")
@@ -408,7 +408,7 @@ class TestHarvestSession:
         mock_exists.return_value = True
         mock_fetch.return_value = False
 
-        with pytest.raises(click.exceptions.Exit):
+        with pytest.raises(typer.Exit):
             harvest_session("test", "my-branch")
 
         mock_fetch.assert_called_once_with(
@@ -437,11 +437,11 @@ class TestHarvestSession:
             args=[], returncode=1, stdout="", stderr="error"
         )
 
-        with pytest.raises(click.exceptions.Exit):
+        with pytest.raises(typer.Exit):
             harvest_session("test", "my-branch")
 
     def test_harvest_protected_branch_rejected(self) -> None:
-        with pytest.raises(click.exceptions.Exit):
+        with pytest.raises(typer.Exit):
             harvest_session("test", "main")
 
     @patch("paude.workflow.subprocess.run")
@@ -713,7 +713,7 @@ class TestHarvestSession:
         )
         mock_running.return_value = False
 
-        with pytest.raises(click.exceptions.Exit):
+        with pytest.raises(typer.Exit):
             harvest_session("test", "my-branch")
 
         mock_init.assert_not_called()
@@ -746,7 +746,7 @@ class TestHarvestSession:
         mock_running.return_value = True
         mock_init.return_value = False
 
-        with pytest.raises(click.exceptions.Exit):
+        with pytest.raises(typer.Exit):
             harvest_session("test", "my-branch")
 
     @patch("paude.workflow.subprocess.run")
@@ -792,7 +792,7 @@ class TestHarvestSession:
         mock_backend = self._setup_mocks(mock_find, tmp_path)
         mock_backend.exec_in_session.return_value = (128, "", "fatal: not a git repo")
 
-        with pytest.raises(click.exceptions.Exit):
+        with pytest.raises(typer.Exit):
             harvest_session("test", "my-branch", container_path="/pvc/wrokspace")
 
         # Bails out before touching remotes, so no stray repo is created.
@@ -814,7 +814,7 @@ class TestHarvestSession:
         mock_exists.return_value = True
         mock_get_url.return_value = "ext::podman exec -i paude-test %S /pvc/workspace"
 
-        with pytest.raises(click.exceptions.Exit):
+        with pytest.raises(typer.Exit):
             harvest_session("test", "my-branch", container_path="/pvc/other")
 
         assert "different container path" in capsys.readouterr().err
@@ -870,7 +870,7 @@ class TestVerifyContainerRepo:
         mock_backend = MagicMock()
         mock_backend.exec_in_session.return_value = (128, "", "fatal: ...")
 
-        with pytest.raises(click.exceptions.Exit):
+        with pytest.raises(typer.Exit):
             _verify_container_repo(mock_backend, "sess", "/pvc/typo")
 
 
@@ -1151,7 +1151,7 @@ class TestStatusSessions:
     ) -> None:
         mock_find.return_value = None
 
-        with pytest.raises(click.exceptions.Exit):
+        with pytest.raises(typer.Exit):
             status_sessions(session_name="nonexistent")
 
         captured = capsys.readouterr()
@@ -1205,7 +1205,7 @@ class TestResetSession:
         mock_backend.get_session.return_value = mock_session
         mock_find.return_value = ("podman", mock_backend)
 
-        with pytest.raises(click.exceptions.Exit):
+        with pytest.raises(typer.Exit):
             reset_session("test")
 
     @patch(
@@ -1283,7 +1283,7 @@ class TestResetSession:
             (0, "abc1234 Some work\n", ""),  # git log --oneline -1 HEAD
         ]
 
-        with pytest.raises(click.exceptions.Exit):
+        with pytest.raises(typer.Exit):
             reset_session("test")
 
     @patch(
@@ -1321,7 +1321,7 @@ class TestResetSession:
         mock_backend = self._setup_mocks(mock_find)
         mock_backend.exec_in_session.return_value = (1, "", "error")
 
-        with pytest.raises(click.exceptions.Exit):
+        with pytest.raises(typer.Exit):
             reset_session("test", force=True)
 
 
